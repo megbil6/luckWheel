@@ -3,27 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>عجلة الحظ - أ. مقبل الزهراني</title>
+    <title>عجلة الحظ المطورة - أ. مقبل الزهراني</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --accent: #e67e22; --success: #27ae60; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .main-card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 700px; text-align: center; border-top: 8px solid var(--primary); }
+        .main-card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 95%; max-width: 850px; text-align: center; border-top: 8px solid var(--primary); }
         .header { margin-bottom: 25px; }
-        .header h1 { margin: 0; color: var(--primary); font-size: 28px; }
-        .header p { margin: 5px 0; color: #7f8c8d; font-weight: bold; }
-        .controls { background: #f8f9fa; padding: 15px; border-radius: 12px; display: flex; gap: 10px; justify-content: center; align-items: center; margin-bottom: 20px; }
-        select, button { padding: 12px 20px; border-radius: 10px; border: 2px solid #ddd; font-size: 16px; outline: none; }
+        .header h1 { margin: 0; color: var(--primary); font-size: 32px; }
+        .controls { background: #f8f9fa; padding: 20px; border-radius: 12px; display: flex; gap: 15px; justify-content: center; align-items: center; margin-bottom: 20px; }
+        select, button { padding: 12px 25px; border-radius: 10px; border: 2px solid #ddd; font-size: 18px; outline: none; }
         button { background: var(--success); color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover:not(:disabled) { background: #219150; transform: translateY(-2px); }
+        button:hover:not(:disabled) { background: #219150; transform: scale(1.05); }
         button:disabled { background: #bdc3c7; cursor: not-allowed; }
-        #wheel-container { position: relative; width: 400px; height: 400px; margin: 20px auto; }
-        canvas { width: 100%; height: 100%; border-radius: 50%; border: 5px solid var(--primary); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        #pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 18px solid transparent; border-right: 18px solid transparent; border-top: 35px solid #e74c3c; z-index: 10; }
-        #winner-area { margin-top: 20px; height: 60px; }
-        #winner-text { font-size: 32px; font-weight: bold; color: var(--accent); }
-        .count-badge { background: var(--primary); color: white; padding: 5px 15px; border-radius: 20px; font-size: 14px; margin-top: 10px; display: inline-block; }
+        
+        /* تكبير حاوية العجلة */
+        #wheel-container { position: relative; width: 550px; height: 550px; margin: 30px auto; }
+        canvas { width: 100%; height: 100%; border-radius: 50%; border: 8px solid var(--primary); box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        
+        #pointer { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 25px solid transparent; border-right: 25px solid transparent; border-top: 45px solid #e74c3c; z-index: 10; filter: drop-shadow(0 4px 5px rgba(0,0,0,0.2)); }
+        #winner-text { font-size: 42px; font-weight: bold; color: var(--accent); margin-top: 20px; min-height: 50px; }
+        .count-badge { background: var(--primary); color: white; padding: 8px 20px; border-radius: 20px; font-size: 16px; margin-top: 15px; display: inline-block; }
     </style>
 </head>
 <body>
@@ -35,9 +36,9 @@
     </div>
 
     <div class="controls">
-        <label>اختر الفصل:</label>
+        <label>الفصل:</label>
         <select id="classSelect" onchange="loadClassData()">
-            <option value="">-- اختر من القائمة --</option>
+            <option value="">-- اختر الفصل --</option>
             <option value="1">فصل 6-1</option>
             <option value="2">فصل 6-2</option>
             <option value="3">فصل 6-3</option>
@@ -52,54 +53,43 @@
 
     <div id="wheel-container">
         <div id="pointer"></div>
-        <canvas id="wheelCanvas" width="500" height="500"></canvas>
+        <canvas id="wheelCanvas" width="800" height="800"></canvas>
     </div>
 
-    <div id="winner-area">
-        <div id="winner-text"></div>
-        <div id="countDisplay" class="count-badge" style="display:none"></div>
-    </div>
+    <div id="winner-text"></div>
+    <div id="countDisplay" class="count-badge" style="display:none"></div>
 </div>
 
 <script>
-    // --- الإعدادات الخاصة بك ---
     const SHEET_ID = '1zSccmM1FinkU12yOGa7N14Ba-e5TCbnsEA6xyxqmtFc';
-    // -------------------------
-
     let names = [];
     let isSpinning = false;
+    let lastSoundIndex = -1;
+
+    // صوت التكتكة
+    const tickSound = new Audio('https://www.soundjay.com/buttons/button-09.mp3');
 
     async function loadClassData() {
         const sheetName = document.getElementById('classSelect').value;
         if (!sheetName) return;
-
         document.getElementById('winner-text').innerText = "جاري التحميل...";
-        
-        // جلب البيانات من صفحة محددة (العمود الأول فقط)
         const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
         
         try {
             const resp = await fetch(url);
             const csvText = await resp.text();
-            
             Papa.parse(csvText, {
                 complete: function(results) {
-                    // نأخذ العمود الأول ونحذف القيم الفارغة والعناوين
                     names = results.data.map(row => row[0])
                                        .filter(n => n && n.trim() !== "" && n !== "الاسم" && n !== "اسم الطالب");
-                    
                     if (names.length > 0) {
                         document.getElementById('winner-text').innerText = "";
                         updateUI();
                         draw(0);
-                    } else {
-                        alert("لم يتم العثور على أسماء في هذه الصفحة");
                     }
                 }
             });
-        } catch (e) {
-            alert("تأكد من أن ملف الشيت (متاح لأي شخص لديه الرابط)");
-        }
+        } catch (e) { alert("تأكد من صلاحيات الملف"); }
     }
 
     function updateUI() {
@@ -114,75 +104,9 @@
         const ctx = canvas.getContext('2d');
         const sections = names.length || 1;
         const arc = 2 * Math.PI / sections;
+        const centerX = 400, centerY = 400, radius = 380;
 
-        ctx.clearRect(0, 0, 500, 500);
-        names.forEach((name, i) => {
-            ctx.beginPath();
-            ctx.fillStyle = `hsl(${(i * 360 / sections)}, 70%, 55%)`;
-            ctx.moveTo(250, 250);
-            ctx.arc(250, 250, 240, i * arc + angle, (i + 1) * arc + angle);
-            ctx.fill();
-            ctx.strokeStyle = "white";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            ctx.save();
-            ctx.translate(250, 250);
-            ctx.rotate(i * arc + arc / 2 + angle);
-            ctx.fillStyle = "white";
-            ctx.font = "bold 18px Segoe UI";
-            ctx.textAlign = "right";
-            ctx.fillText(name.substring(0, 15), 210, 8);
-            ctx.restore();
-        });
-    }
-
-    function spin() {
-        if (isSpinning || names.length === 0) return;
-        isSpinning = true;
-        document.getElementById('spinBtn').disabled = true;
-        document.getElementById('winner-text').innerText = "انتظر...";
-
-        let duration = 4000;
-        let totalRotation = 1440 + Math.random() * 1800; 
-        let start = null;
-
-        function animate(timestamp) {
-            if (!start) start = timestamp;
-            let progress = timestamp - start;
-            let p = progress / duration;
-            let easeOut = 1 - Math.pow(1 - p, 4);
-            let currentAngle = (totalRotation * easeOut) * (Math.PI / 180);
-            draw(currentAngle);
-            if (progress < duration) requestAnimationFrame(animate);
-            else finalize(currentAngle);
-        }
-        requestAnimationFrame(animate);
-    }
-
-  function finalize(angle) {
-        isSpinning = false;
-        const sections = names.length;
-        const arc = 2 * Math.PI / sections;
+        ctx.clearRect(0, 0, 800, 800);
         
-        // حساب الزاوية الفعلية مع مراعاة أن المؤشر موجود في الأعلى (-90 درجة)
-        let normalized = (angle % (2 * Math.PI));
-        
-        // المعادلة المحدثة لضبط التوافق بين السهم والاسم
-        let index = Math.floor(sections - ((normalized + Math.PI/2) % (2 * Math.PI)) / arc) % sections;
-        
-        const winner = names[index];
-        document.getElementById('winner-text').innerText = "⭐ " + winner + " ⭐";
-        
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-
-        // حذف الاسم فوراً
-        names.splice(index, 1);
-        setTimeout(() => {
-            updateUI();
-            draw(0);
-        }, 2500);
-    }
-</script>
-</body>
-</html>
+        // حساب الاندكس الحالي للسهم لتشغيل الصوت
+        if(isSpinning) {
