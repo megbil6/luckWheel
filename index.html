@@ -160,12 +160,16 @@
         requestAnimationFrame(animate);
     }
 
-    function finalize(angle) {
+  function finalize(angle) {
         isSpinning = false;
         const sections = names.length;
         const arc = 2 * Math.PI / sections;
-        let normalized = angle % (2 * Math.PI);
-        let index = Math.floor(sections - (normalized / arc)) % sections;
+        
+        // حساب الزاوية الفعلية مع مراعاة أن المؤشر موجود في الأعلى (-90 درجة)
+        let normalized = (angle % (2 * Math.PI));
+        
+        // المعادلة المحدثة لضبط التوافق بين السهم والاسم
+        let index = Math.floor(sections - ((normalized + Math.PI/2) % (2 * Math.PI)) / arc) % sections;
         
         const winner = names[index];
         document.getElementById('winner-text').innerText = "⭐ " + winner + " ⭐";
